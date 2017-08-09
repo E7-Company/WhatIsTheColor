@@ -1,4 +1,4 @@
-package com.e7.whatisthecolor.Class;
+package com.e7.whatisthecolor.Classes;
 
 /**
  * Created by Enrique on 10/06/2017.

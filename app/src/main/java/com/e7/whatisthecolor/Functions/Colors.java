@@ -1,8 +1,8 @@
-package com.e7.whatisthecolor.Controller;
+package com.e7.whatisthecolor.Functions;
 
 import android.content.Context;
 
-import com.e7.whatisthecolor.Class.Color;
+import com.e7.whatisthecolor.Classes.Color;
 
 import org.json.JSONArray;
 import org.json.JSONException;

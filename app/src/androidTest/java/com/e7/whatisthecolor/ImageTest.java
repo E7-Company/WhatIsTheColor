@@ -5,9 +5,8 @@ import android.graphics.BitmapFactory;
 import android.support.test.InstrumentationRegistry;
 import android.support.test.runner.AndroidJUnit4;
 
-import com.e7.whatisthecolor.Class.Color;
-import com.e7.whatisthecolor.Controller.Colors;
-import com.e7.whatisthecolor.Controller.Image;
+import com.e7.whatisthecolor.Functions.Colors;
+import com.e7.whatisthecolor.Functions.Image;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;

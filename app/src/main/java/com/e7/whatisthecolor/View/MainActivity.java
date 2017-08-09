@@ -13,19 +13,15 @@ import android.speech.tts.TextToSpeech;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
-import android.view.Display;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.MotionEvent;
-import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
-import android.view.WindowManager;
 import android.widget.ImageView;
 import android.widget.Toast;
 
-import com.e7.whatisthecolor.Controller.Image;
 import com.e7.whatisthecolor.Presenter.IMainPresenter;
 import com.e7.whatisthecolor.Presenter.MainPresenter;
 import com.e7.whatisthecolor.R;
@@ -35,13 +31,18 @@ import com.mikepenz.aboutlibraries.LibsBuilder;
 import java.io.IOException;
 import java.util.Locale;
 
+import butterknife.BindView;
+import butterknife.ButterKnife;
+
 public class MainActivity extends AppCompatActivity  implements IMainActivity, SurfaceHolder.Callback {
 
     //region VARIABLES
     // a variable to store a reference to the Image View at the main.xml file
-    private ImageView iv_image;
+    @BindView(R.id.imageView) ImageView iv_image;
     // a variable to store a reference to the Surface View at the main.xml file
-    private SurfaceView sv;
+    @BindView(R.id.surfaceView) SurfaceView sv;
+    // the toolbar for the app
+    @BindView(R.id.toolbar) Toolbar toolbar;
 
     // a bitmap to display the captured image
     private Bitmap bmp;
@@ -57,8 +58,6 @@ public class MainActivity extends AppCompatActivity  implements IMainActivity, S
 
     private SharedPreferences pref;
     private SharedPreferences.Editor editor;
-    private int width = 0, height = 0;
-    private Camera.Size pictureSize;
 
     private boolean safeToTakePicture = false;
     private TextToSpeech tts;
@@ -84,7 +83,8 @@ public class MainActivity extends AppCompatActivity  implements IMainActivity, S
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+        ButterKnife.bind(this);
+
         toolbar.setTitleTextColor(Color.BLACK);
         setSupportActionBar(toolbar);
         getSupportActionBar().setDisplayShowHomeEnabled(true);
@@ -93,7 +93,24 @@ public class MainActivity extends AppCompatActivity  implements IMainActivity, S
         setPresenter(new MainPresenter(this, this));
         presenter().start();
 
-        //Init TextToSpeech and select default language
+        // Init TextToSpeech
+        initTTS();
+
+        pref = getApplicationContext().getSharedPreferences("MyPref", 0);
+        editor = pref.edit();
+
+        // Get a surface
+        sHolder = sv.getHolder();
+
+        // Add the callback interface methods defined below as the Surface View callbacks
+        sHolder.addCallback(this);
+
+        // Tells Android that this surface will have its data constantly replaced
+        sHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
+    }
+
+    /** Init TextToSpeech and select default language */
+    private void initTTS() {
         tts=new TextToSpeech(getApplicationContext(), new TextToSpeech.OnInitListener() {
             @Override
             public void onInit(int status) {
@@ -102,7 +119,7 @@ public class MainActivity extends AppCompatActivity  implements IMainActivity, S
 
                     //If language not exists, install it
                     if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-                        Log.e(getPackageName(), "This Language is not supported");
+                        showError("This Language is not supported");
                         Intent installIntent = new Intent();
                         installIntent.setAction(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA);
                         startActivity(installIntent);
@@ -110,26 +127,6 @@ public class MainActivity extends AppCompatActivity  implements IMainActivity, S
                 }
             }
         });
-
-        pref = getApplicationContext().getSharedPreferences("MyPref", 0);
-        editor = pref.edit();
-
-        // get the Image View at the main.xml file
-        iv_image = (ImageView) findViewById(R.id.imageView);
-
-        // get the Surface View at the main.xml file
-        sv = (SurfaceView) findViewById(R.id.surfaceView);
-
-        // Get a surface
-        sHolder = sv.getHolder();
-
-        // add the callback interface methods defined below as the Surface View
-        // callbacks
-        sHolder.addCallback(this);
-
-        // tells Android that this surface will have its data constantly
-        // replaced
-        sHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
     }
 
     //region SHARED FUNCTIONS
@@ -158,6 +155,12 @@ public class MainActivity extends AppCompatActivity  implements IMainActivity, S
     /** Dismiss progress view. */
     public void dismissProgress() {
         progress.dismiss();
+    }
+
+    /** Show error message in a toast and in the log */
+    public void showError(String error) {
+        Toast.makeText(getApplicationContext(), error, Toast.LENGTH_SHORT).show();
+        Log.i(getPackageName(), error);
     }
     //endregion
 
@@ -196,9 +199,13 @@ public class MainActivity extends AppCompatActivity  implements IMainActivity, S
     public void surfaceChanged(SurfaceHolder sv, int arg1, int arg2, int arg3) {
         // get camera parameters
         parameters = mCamera.getParameters();
-        setBestPictureResolution();
+
+        // get biggest picture size
+        int width = pref.getInt("Picture_Width", 0);
+        int height = pref.getInt("Picture_height", 0);
+        parameters = presenter().setBestPictureResolution(parameters, width, height, editor);
         parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE);
-        setCameraDisplayOrientation(mCamera);
+        presenter().setCameraDisplayOrientation(mCamera);
 
         try {
             mCamera.setPreviewDisplay(sv);
@@ -219,7 +226,7 @@ public class MainActivity extends AppCompatActivity  implements IMainActivity, S
 
                 // decode the data obtained by the camera into a Bitmap
                 if (data != null) {
-                    bmp = Image.decodeBitmap(data);
+                    bmp = presenter().decodeBitmap(data);
                 }
                 // set the iv_image
                 if (bmp != null) {
@@ -237,7 +244,7 @@ public class MainActivity extends AppCompatActivity  implements IMainActivity, S
     public void surfaceCreated(SurfaceHolder holder) {
         // The Surface has been created, acquire the camera and tell it where
         // to draw the preview.
-        mCamera = getCameraInstance();
+        mCamera = presenter().getCameraInstance();
         if (mCamera != null) {
             try {
                 mCamera.setPreviewDisplay(holder);
@@ -263,115 +270,6 @@ public class MainActivity extends AppCompatActivity  implements IMainActivity, S
     }
     //endregion
 
-    //endregion
-
-    //region CAMERA PARAMETERS AND OPTIONS
-    /** Set the camera display oriented to screen. */
-    public void setCameraDisplayOrientation(android.hardware.Camera camera) {
-        android.hardware.Camera.CameraInfo camInfo =
-                new android.hardware.Camera.CameraInfo();
-        android.hardware.Camera.getCameraInfo(getBackFacingCameraId(), camInfo);
-
-        Display display = ((WindowManager) this.getSystemService(Context.WINDOW_SERVICE)).getDefaultDisplay();
-        int rotation = display.getRotation();
-        int degrees = 0;
-        switch (rotation) {
-            case Surface.ROTATION_0:
-                degrees = 0;
-                break;
-            case Surface.ROTATION_90:
-                degrees = 90;
-                break;
-            case Surface.ROTATION_180:
-                degrees = 180;
-                break;
-            case Surface.ROTATION_270:
-                degrees = 270;
-                break;
-        }
-
-        int result;
-        if (camInfo.facing == Camera.CameraInfo.CAMERA_FACING_FRONT) {
-            result = (camInfo.orientation + degrees) % 360;
-            result = (360 - result) % 360;  // compensate the mirror
-        } else {  // back-facing
-            result = (camInfo.orientation - degrees + 360) % 360;
-        }
-        camera.setDisplayOrientation(result);
-    }
-
-    /** A safe way to get an instance of the Camera object. */
-    public Camera getCameraInstance() {
-        Camera c = null;
-        try {
-            c = Camera.open(); // attempt to get a Camera instance
-        } catch (Exception e) {
-            // Camera is not available (in use or does not exist)
-            String error = "Camera is not available (in use or does not exist): " + e;
-            Toast.makeText(getApplicationContext(), error, Toast.LENGTH_SHORT).show();
-            Log.i(getPackageName(), error);
-        }
-        return c; // returns null if camera is unavailable
-    }
-
-    /** Detect if mobile has back camera. */
-    private int getBackFacingCameraId() {
-        int cameraId = -1;
-        // Search for the front facing camera
-        int numberOfCameras = Camera.getNumberOfCameras();
-        for (int i = 0; i < numberOfCameras; i++) {
-            Camera.CameraInfo info = new Camera.CameraInfo();
-            Camera.getCameraInfo(i, info);
-            if (info.facing == Camera.CameraInfo.CAMERA_FACING_BACK) {
-                cameraId = i;
-                break;
-            }
-        }
-        return cameraId;
-    }
-
-    /** Set better picture resolution to get the color from photo. */
-    private void setBestPictureResolution() {
-        // get biggest picture size
-        width = pref.getInt("Picture_Width", 0);
-        height = pref.getInt("Picture_height", 0);
-
-        if (width == 0 | height == 0) {
-            pictureSize = getBiggesttPictureSize(parameters);
-            if (pictureSize != null)
-                parameters
-                        .setPictureSize(pictureSize.width, pictureSize.height);
-            // save width and height in sharedprefrences
-            width = pictureSize.width;
-            height = pictureSize.height;
-            editor.putInt("Picture_Width", width);
-            editor.putInt("Picture_height", height);
-            editor.commit();
-
-        } else {
-            parameters.setPictureSize(width, height);
-        }
-    }
-
-    /** Get the default biggest picture size. */
-    private Camera.Size getBiggesttPictureSize(Camera.Parameters parameters) {
-        Camera.Size result = null;
-
-        for (Camera.Size size : parameters.getSupportedPictureSizes()) {
-            if (result == null) {
-                result = size;
-            } else {
-                int resultArea = result.width * result.height;
-                int newArea = size.width * size.height;
-
-                if (newArea > resultArea) {
-                    result = size;
-                }
-            }
-        }
-
-        return (result);
-    }
     //endregion
 
     //region MENU
@@ -404,6 +302,5 @@ public class MainActivity extends AppCompatActivity  implements IMainActivity, S
         }
     }
     //endregion
-
 
 }

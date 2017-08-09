@@ -3,8 +3,8 @@ package com.e7.whatisthecolor;
 import android.support.test.InstrumentationRegistry;
 import android.support.test.runner.AndroidJUnit4;
 
-import com.e7.whatisthecolor.Class.Color;
-import com.e7.whatisthecolor.Controller.Colors;
+import com.e7.whatisthecolor.Classes.Color;
+import com.e7.whatisthecolor.Functions.Colors;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
