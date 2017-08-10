@@ -85,10 +85,8 @@ public class MainActivity extends AppCompatActivity  implements IMainActivity, S
         setContentView(R.layout.activity_main);
         ButterKnife.bind(this);
 
-        toolbar.setTitleTextColor(Color.BLACK);
-        setSupportActionBar(toolbar);
-        getSupportActionBar().setDisplayShowHomeEnabled(true);
-        getSupportActionBar().setIcon(R.drawable.ic_launcher);
+        // Init Toolbar
+        initToolbar();
 
         setPresenter(new MainPresenter(this, this));
         presenter().start();
@@ -107,6 +105,14 @@ public class MainActivity extends AppCompatActivity  implements IMainActivity, S
 
         // Tells Android that this surface will have its data constantly replaced
         sHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
+    }
+    
+    /** Init Toolbar with color and icon by default */
+    private void initToolbar() {
+        toolbar.setTitleTextColor(Color.BLACK);
+        setSupportActionBar(toolbar);
+        getSupportActionBar().setDisplayShowHomeEnabled(true);
+        getSupportActionBar().setIcon(R.drawable.ic_launcher);
     }
 
     /** Init TextToSpeech and select default language */
