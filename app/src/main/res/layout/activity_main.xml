@@ -4,7 +4,7 @@
     android:id="@+id/activity_main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context="com.e7.whatisthecolor.View.MainActivity">
+    tools:context="com.e7.whatisthecolor.view.activity.MainActivity">
 
     <SurfaceView
         android:id="@+id/surfaceView"

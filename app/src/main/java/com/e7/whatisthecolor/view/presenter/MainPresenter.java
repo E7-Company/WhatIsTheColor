@@ -1,4 +1,4 @@
-package com.e7.whatisthecolor.Presenter;
+package com.e7.whatisthecolor.view.presenter;
 
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
@@ -6,35 +6,62 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.hardware.Camera;
-import android.os.AsyncTask;
 import android.util.Log;
 import android.view.Display;
 import android.view.Surface;
 import android.view.WindowManager;
 import android.widget.ImageView;
 
-import com.e7.whatisthecolor.Functions.Colors;
-import com.e7.whatisthecolor.Functions.Image;
-import com.e7.whatisthecolor.View.IMainActivity;
+import com.e7.whatisthecolor.utils.Image;
+import com.e7.whatisthecolor.domain.model.Color;
+import com.e7.whatisthecolor.domain.usecase.GetColors;
+import com.e7.whatisthecolor.domain.usecase.UseCaseObserver;
+import com.e7.whatisthecolor.view.activity.IMainActivity;
+import com.e7.whatisthecolor.view.viewmodel.ColorViewModel;
+import com.e7.whatisthecolor.view.viewmodel.mapper.ColorViewModelToColorMapper;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.inject.Inject;
 
 /**
  * Created by Enrique on 14/06/2017.
  */
 
-public class MainPresenter implements IMainPresenter {
+public class MainPresenter extends Presenter<IMainActivity> {
 
-    private IMainActivity view;
     private Context context;
+    private IMainActivity view;
+    private GetColors getColors;
+    private ColorViewModelToColorMapper mapper;
+    private List<ColorViewModel> colors;
+
+    public IMainActivity getView() {
+        return view;
+    }
+
+    public void setView(IMainActivity view) {
+        this.view = view;
+    }
 
     /** Constructor to set the context and the interface view. */
-    public MainPresenter (IMainActivity view, Context context) {
-        this.view = view;
+    @Inject
+    public MainPresenter (Context context, GetColors getColors, ColorViewModelToColorMapper mapper) {
         this.context = context;
+        this.getColors = getColors;
+        this.mapper = mapper;
     }
 
     /** Start loading colors from a file with Asynctask. */
     public void start() {
-        new LoadColors().execute();
+        getView().showProgress("Loading Colors...");
+        getColors.execute(new ColorListObserver());
+    }
+
+    public void destroy() {
+        this.getColors.dispose();
+        setView(null);
     }
 
     //region CAMERA PARAMETERS AND OPTIONS
@@ -145,13 +172,19 @@ public class MainPresenter implements IMainPresenter {
 
     //endregion
 
+    /** Decode bitmap and show and speech color name */
+    public void takeAPicture(byte[] data) {
+        Bitmap bmp = decodeBitmap(data);
+        bitmapColor(bmp);
+    }
+
     /** Decode image data to bitmap */
-    public Bitmap decodeBitmap(final byte[] data) {
+    private Bitmap decodeBitmap(final byte[] data) {
         return Image.decodeBitmap(data);
     }
 
     /** Animation to fade an ImageView. */
-    public void FadeAnimation(final ImageView v,
+    public void fadeAnimation(final ImageView v,
                                      final float begin_alpha, final float end_alpha, int time) {
         ObjectAnimator fade = ObjectAnimator.ofFloat(v, "alpha",  begin_alpha, end_alpha);
         fade.setDuration(time);
@@ -162,8 +195,9 @@ public class MainPresenter implements IMainPresenter {
         mAnimationSet.start();
     }
 
+
     /** Get color from a bitmap. */
-    public void BitmapColor(final Bitmap bmp) {
+    private void bitmapColor(final Bitmap bmp) {
         new Thread(new Runnable() {
             public void run() {
                 //Reduce bitmap size
@@ -177,7 +211,7 @@ public class MainPresenter implements IMainPresenter {
                 Log.e(context.getPackageName(), "COLOR: " + colorHex);
 
                 //Get the color String name
-                final String colorName = Colors.getColorName(colorHex);
+                final String colorName = getColorName(colorHex);
                 Log.e(context.getPackageName(), "COLOR NAME: " + colorName);
 
                 //Speech the color
@@ -186,24 +220,62 @@ public class MainPresenter implements IMainPresenter {
         }).start();
     }
 
-    /** Asynchronous task Class to load color. */
-    class LoadColors extends AsyncTask<Void, Void, Void> {
+    /**
+     * Returns a String with the name of the color more approximated
+     * from the colors array loaded.
+     * <p>
+     * This method calc the RGB and HSL from the hexadecimal String
+     * and compare it with all the list from colors.
+     *
+     * @param  color the hexadecimal number from a color
+     * @return       a color name
+     */
+    public String getColorName(String color) {
+        int c = (int)Long.parseLong(color, 16);
+        int r = (c >> 16) & 0xFF;
+        int g = (c >> 8) & 0xFF;
+        int b = (c >> 0) & 0xFF;
 
-        @Override
-        protected void onPreExecute() {
-            view.showProgress("Loading colors...");
+        int []hsl = Color.rgbToHsl(r,g,b);
+        int h = hsl[0], s = hsl[1], l = hsl[2];
+
+        int ndf1;
+        int ndf2;
+        int ndf;
+        int cl = -1, df = -1;
+
+        for(int i = 0; i < colors.size(); i++)
+        {
+            if(color == "#" + colors.get(i).getHex())
+                return colors.get(i).getName();
+
+            ndf1 = (int) (Math.pow(r - Integer.parseInt(colors.get(i).getRed()), 2) + Math.pow(g - Integer.parseInt(colors.get(i).getGreen()), 2) + Math.pow(b - Integer.parseInt(colors.get(i).getBlue()), 2));
+            ndf2 = (int) (Math.pow(h - Integer.parseInt(colors.get(i).getHue()), 2) + Math.pow(s - Integer.parseInt(colors.get(i).getSaturation()), 2) + Math.pow(l - Integer.parseInt(colors.get(i).getLightness()), 2));
+            ndf = ndf1 + ndf2 * 2;
+            if(df < 0 || df > ndf)
+            {
+                df = ndf;
+                cl = i;
+            }
         }
 
-        @Override
-        protected Void doInBackground(Void... voids) {
-            Colors.loadColors(context, "colors.json");
-            return null;
+        return colors.get(cl).getName();
+    }
+
+    private final class ColorListObserver extends UseCaseObserver<List<Color>> {
+
+        @Override public void onComplete() {
+            getView().dismissProgress();
         }
 
-        @Override
-        protected void onPostExecute(Void aVoid) {
-            view.dismissProgress();
+        @Override public void onError(Throwable e) {
+            getView().dismissProgress();
+            e.printStackTrace();
         }
 
+        @Override public void onNext(List<Color> colorList) {
+            List<ColorViewModel> colorViewModels = mapper.reverseMap(colorList);
+            colors = new ArrayList<ColorViewModel>(colorViewModels);
+        }
     }
 }

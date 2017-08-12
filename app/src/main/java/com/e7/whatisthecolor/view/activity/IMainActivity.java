@@ -1,4 +1,4 @@
-package com.e7.whatisthecolor.View;
+package com.e7.whatisthecolor.view.activity;
 
 /**
  * Created by Enrique on 14/06/2017.

@@ -1,4 +1,4 @@
-package com.e7.whatisthecolor.Classes;
+package com.e7.whatisthecolor.domain.model;
 
 /**
  * Created by Enrique on 10/06/2017.
@@ -20,7 +20,7 @@ public class Color {
     private String lightness;
 
     /** Color class constructor */
-    public Color (String hex, String name) {
+    public Color(String hex, String name) {
         this.hex = hex;
         this.name = name;
 

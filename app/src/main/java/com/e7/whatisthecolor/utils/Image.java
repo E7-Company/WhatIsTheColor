@@ -1,4 +1,4 @@
-package com.e7.whatisthecolor.Functions;
+package com.e7.whatisthecolor.utils;
 
 import android.graphics.*;
 

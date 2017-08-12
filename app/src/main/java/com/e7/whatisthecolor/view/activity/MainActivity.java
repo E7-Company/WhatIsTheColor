@@ -1,17 +1,12 @@
-package com.e7.whatisthecolor.View;
+package com.e7.whatisthecolor.view.activity;
 
 import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.graphics.Bitmap;
-import android.graphics.Color;
 import android.hardware.Camera;
 import android.media.AudioManager;
-import android.os.Bundle;
 import android.speech.tts.TextToSpeech;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -22,91 +17,72 @@ import android.view.SurfaceView;
 import android.widget.ImageView;
 import android.widget.Toast;
 
-import com.e7.whatisthecolor.Presenter.IMainPresenter;
-import com.e7.whatisthecolor.Presenter.MainPresenter;
+import com.e7.whatisthecolor.WITCApplication;
+import com.e7.whatisthecolor.view.base.view.BaseActivity;
 import com.e7.whatisthecolor.R;
+import com.e7.whatisthecolor.view.presenter.MainPresenter;
 import com.mikepenz.aboutlibraries.Libs;
 import com.mikepenz.aboutlibraries.LibsBuilder;
 
 import java.io.IOException;
 import java.util.Locale;
 
-import butterknife.BindView;
-import butterknife.ButterKnife;
+import javax.inject.Inject;
 
-public class MainActivity extends AppCompatActivity  implements IMainActivity, SurfaceHolder.Callback {
+import butterknife.BindView;
+
+public class MainActivity extends BaseActivity implements IMainActivity, SurfaceHolder.Callback {
 
     //region VARIABLES
     // a variable to store a reference to the Image View at the main.xml file
     @BindView(R.id.imageView) ImageView iv_image;
     // a variable to store a reference to the Surface View at the main.xml file
     @BindView(R.id.surfaceView) SurfaceView sv;
-    // the toolbar for the app
-    @BindView(R.id.toolbar) Toolbar toolbar;
 
-    // a bitmap to display the captured image
-    private Bitmap bmp;
-
-    // Camera variables
-    // a surface holder
-    private SurfaceHolder sHolder;
     // a variable to control the camera
     private Camera mCamera;
-    // the camera parameters
-    private Camera.Parameters parameters;
     private Camera.PictureCallback mCall;
 
     private SharedPreferences pref;
-    private SharedPreferences.Editor editor;
 
     private boolean safeToTakePicture = false;
     private TextToSpeech tts;
     private ProgressDialog progress;
 
-    private IMainPresenter presenter;
+    @Inject
+    MainPresenter presenter;
     //endregion
 
-    public void setPresenter(IMainPresenter presenter) {
-        this.presenter = presenter;
-    }
-
-    public IMainPresenter presenter() {
-        if (presenter == null) {
-            throw new IllegalStateException("Trying to use unseted presenter");
-        }
-
-        return presenter;
-    }
 
     /** Called when the activity is first created. */
     @Override
-    public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-        ButterKnife.bind(this);
+    public void initView() {
+        super.initView();
 
-        toolbar.setTitleTextColor(Color.BLACK);
-        setSupportActionBar(toolbar);
-        getSupportActionBar().setDisplayShowHomeEnabled(true);
-        getSupportActionBar().setIcon(R.drawable.ic_launcher);
-
-        setPresenter(new MainPresenter(this, this));
-        presenter().start();
-
-        // Init TextToSpeech
+        initDagger();
         initTTS();
+        initPresenter();
 
         pref = getApplicationContext().getSharedPreferences("MyPref", 0);
-        editor = pref.edit();
 
         // Get a surface
-        sHolder = sv.getHolder();
+        SurfaceHolder sHolder = sv.getHolder();
 
         // Add the callback interface methods defined below as the Surface View callbacks
         sHolder.addCallback(this);
 
         // Tells Android that this surface will have its data constantly replaced
         sHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
+    }
+
+    @Override protected int getLayoutId() {
+        return R.layout.activity_main;
+    }
+
+    /** Init Dagger and Dependency Injector */
+    private void initDagger() {
+        WITCApplication app = (WITCApplication) getApplication();
+        app.getMainComponent().inject(this);
     }
 
     /** Init TextToSpeech and select default language */
@@ -127,6 +103,17 @@ public class MainActivity extends AppCompatActivity  implements IMainActivity, S
                 }
             }
         });
+    }
+
+    /** Init Presenter */
+    private void initPresenter() {
+        presenter.setView(this);
+        presenter.start();
+    }
+
+    @Override protected void onDestroy() {
+        super.onDestroy();
+        presenter.destroy();
     }
 
     //region SHARED FUNCTIONS
@@ -189,7 +176,7 @@ public class MainActivity extends AppCompatActivity  implements IMainActivity, S
         public void onShutter() {
             AudioManager mgr = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
             mgr.playSoundEffect(AudioManager.FLAG_PLAY_SOUND);
-            presenter().FadeAnimation(iv_image,0f,.7f,500);
+            presenter.fadeAnimation(iv_image,0f,.7f,500);
         }
     };
 
@@ -198,14 +185,15 @@ public class MainActivity extends AppCompatActivity  implements IMainActivity, S
     @Override
     public void surfaceChanged(SurfaceHolder sv, int arg1, int arg2, int arg3) {
         // get camera parameters
-        parameters = mCamera.getParameters();
+        Camera.Parameters parameters = mCamera.getParameters();
 
         // get biggest picture size
+        SharedPreferences.Editor editor = pref.edit();
         int width = pref.getInt("Picture_Width", 0);
         int height = pref.getInt("Picture_height", 0);
-        parameters = presenter().setBestPictureResolution(parameters, width, height, editor);
+        parameters = presenter.setBestPictureResolution(parameters, width, height, editor);
         parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE);
-        presenter().setCameraDisplayOrientation(mCamera);
+        presenter.setCameraDisplayOrientation(mCamera);
 
         try {
             mCamera.setPreviewDisplay(sv);
@@ -223,15 +211,10 @@ public class MainActivity extends AppCompatActivity  implements IMainActivity, S
         mCall = new Camera.PictureCallback() {
             @Override
             public void onPictureTaken(final byte[] data, Camera camera) {
-
                 // decode the data obtained by the camera into a Bitmap
                 if (data != null) {
-                    bmp = presenter().decodeBitmap(data);
-                }
-                // set the iv_image
-                if (bmp != null) {
-                    presenter().FadeAnimation(iv_image,.7f,0f,500);
-                    presenter().BitmapColor(bmp);
+                    presenter.fadeAnimation(iv_image,.7f,0f,500);
+                    presenter.takeAPicture(data);
                     mCamera.startPreview();
                     safeToTakePicture = true;
                 }
@@ -244,7 +227,7 @@ public class MainActivity extends AppCompatActivity  implements IMainActivity, S
     public void surfaceCreated(SurfaceHolder holder) {
         // The Surface has been created, acquire the camera and tell it where
         // to draw the preview.
-        mCamera = presenter().getCameraInstance();
+        mCamera = presenter.getCameraInstance();
         if (mCamera != null) {
             try {
                 mCamera.setPreviewDisplay(holder);
