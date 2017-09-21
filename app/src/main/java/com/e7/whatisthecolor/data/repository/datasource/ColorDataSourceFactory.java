@@ -23,8 +23,8 @@ public class ColorDataSourceFactory {
     }
 
     public ColorLocalApiDataSource createDataSource() {
-        ColorEntityJsonMapper teamEntityJsonMapper = new ColorEntityJsonMapper();
-        LocalApi local = new LocalApi(context, teamEntityJsonMapper);
+        ColorEntityJsonMapper colorEntityJsonMapper = new ColorEntityJsonMapper();
+        LocalApi local = new LocalApi(context, colorEntityJsonMapper);
         return new ColorLocalApiDataSource(local);
     }
 }

@@ -1,12 +1,16 @@
 package com.e7.whatisthecolor.view.activity;
 
+import android.Manifest;
 import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.hardware.Camera;
 import android.media.AudioManager;
 import android.speech.tts.TextToSpeech;
+import android.support.design.widget.Snackbar;
+import android.support.v4.content.ContextCompat;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -14,6 +18,7 @@ import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.Toast;
 
@@ -21,6 +26,9 @@ import com.e7.whatisthecolor.WITCApplication;
 import com.e7.whatisthecolor.view.base.view.BaseActivity;
 import com.e7.whatisthecolor.R;
 import com.e7.whatisthecolor.view.presenter.MainPresenter;
+import com.karumi.dexter.Dexter;
+import com.karumi.dexter.listener.single.PermissionListener;
+import com.karumi.dexter.listener.single.SnackbarOnDeniedPermissionListener;
 import com.mikepenz.aboutlibraries.Libs;
 import com.mikepenz.aboutlibraries.LibsBuilder;
 
@@ -61,7 +69,10 @@ public class MainActivity extends BaseActivity implements IMainActivity, Surface
 
         initDagger();
         initTTS();
+        detectPermission();
         initPresenter();
+        //Preview preview = new Preview(this);
+        //sv.add
 
         pref = getApplicationContext().getSharedPreferences("MyPref", 0);
 
@@ -114,6 +125,32 @@ public class MainActivity extends BaseActivity implements IMainActivity, Surface
     @Override protected void onDestroy() {
         super.onDestroy();
         presenter.destroy();
+    }
+
+    /** Detect and allow camera permission */
+    private void detectPermission() {
+        final ViewGroup viewGroup = (ViewGroup) ((ViewGroup) this
+                .findViewById(android.R.id.content)).getChildAt(0);
+
+        PermissionListener snackbarPermissionListener =
+                SnackbarOnDeniedPermissionListener.Builder
+                        .with(viewGroup, "Camera access is needed to scan the color")
+                        .withOpenSettingsButton("Settings")
+                        .withCallback(new Snackbar.Callback() {
+                            @Override
+                            public void onShown(Snackbar snackbar) {
+                                // Event handler for when the given Snackbar is visible
+                            }
+                            @Override
+                            public void onDismissed(Snackbar snackbar, int event) {
+                                // Event handler for when the given Snackbar has been dismissed
+                            }
+                        }).build();
+
+        Dexter.withActivity(this)
+                .withPermission(android.Manifest.permission.CAMERA)
+                .withListener(snackbarPermissionListener)
+                .check();
     }
 
     //region SHARED FUNCTIONS
@@ -184,42 +221,45 @@ public class MainActivity extends BaseActivity implements IMainActivity, Surface
     /** Method to detect surface is changed. */
     @Override
     public void surfaceChanged(SurfaceHolder sv, int arg1, int arg2, int arg3) {
-        // get camera parameters
-        Camera.Parameters parameters = mCamera.getParameters();
 
-        // get biggest picture size
-        SharedPreferences.Editor editor = pref.edit();
-        int width = pref.getInt("Picture_Width", 0);
-        int height = pref.getInt("Picture_height", 0);
-        parameters = presenter.setBestPictureResolution(parameters, width, height, editor);
-        parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE);
-        presenter.setCameraDisplayOrientation(mCamera);
+        if(ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            // get camera parameters
+            Camera.Parameters parameters = mCamera.getParameters();
 
-        try {
-            mCamera.setPreviewDisplay(sv);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+            // get biggest picture size
+            SharedPreferences.Editor editor = pref.edit();
+            int width = pref.getInt("Picture_Width", 0);
+            int height = pref.getInt("Picture_height", 0);
+            parameters = presenter.setBestPictureResolution(parameters, width, height, editor);
+            parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE);
+            presenter.setCameraDisplayOrientation(mCamera);
 
-        mCamera.setParameters(parameters);
-        // set camera parameters
-
-        mCamera.startPreview();
-        safeToTakePicture = true;
-
-        // sets what code should be executed after the picture is taken
-        mCall = new Camera.PictureCallback() {
-            @Override
-            public void onPictureTaken(final byte[] data, Camera camera) {
-                // decode the data obtained by the camera into a Bitmap
-                if (data != null) {
-                    presenter.fadeAnimation(iv_image,.7f,0f,500);
-                    presenter.takeAPicture(data);
-                    mCamera.startPreview();
-                    safeToTakePicture = true;
-                }
+            try {
+                mCamera.setPreviewDisplay(sv);
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-        };
+
+            mCamera.setParameters(parameters);
+            // set camera parameters
+
+            mCamera.startPreview();
+            safeToTakePicture = true;
+
+            // sets what code should be executed after the picture is taken
+            mCall = new Camera.PictureCallback() {
+                @Override
+                public void onPictureTaken(final byte[] data, Camera camera) {
+                    // decode the data obtained by the camera into a Bitmap
+                    if (data != null) {
+                        presenter.fadeAnimation(iv_image, .7f, 0f, 500);
+                        presenter.takeAPicture(data);
+                        mCamera.startPreview();
+                        safeToTakePicture = true;
+                    }
+                }
+            };
+        }
     }
 
     /** Method to detect surface is created. */
@@ -275,7 +315,7 @@ public class MainActivity extends BaseActivity implements IMainActivity, Surface
                         .withFields(R.string.class.getFields())
                         .withAboutIconShown(true)
                         .withAboutVersionShownName(true)
-                        .withAboutDescription("Copyright \u00a9 2017 - E7 Company<br>All rights reserved<br><a href=http://www.e7company.tk>www.e7company.tk</a>")
+                        .withAboutDescription("Copyright \u00a9 2017 - E7 Company<br>All rights reserved<br><a href=http://www.e7-company.tk>www.e7-company.tk</a>")
                         .withActivityStyle(Libs.ActivityStyle.LIGHT)
                         //start the activity
                         .start(this);

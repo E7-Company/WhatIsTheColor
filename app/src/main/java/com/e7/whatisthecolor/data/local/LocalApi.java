@@ -41,7 +41,7 @@ public class LocalApi implements ILocalApi {
                     emitter.onComplete();
                 } else {
                     emitter.onError(
-                            new Throwable("Error getting team data list from the local json (euro_data.json)"));
+                            new Throwable("Error getting color data list from the local json (colors.json)"));
                 }
             }
         });
@@ -56,7 +56,7 @@ public class LocalApi implements ILocalApi {
     }
 
     /**
-     * This methods works to read a local JSON (euro_data.json) from assets.
+     * This methods works to read a local JSON (colors.json) from assets.
      */
 
     private String getResponseFromLocalJson() {

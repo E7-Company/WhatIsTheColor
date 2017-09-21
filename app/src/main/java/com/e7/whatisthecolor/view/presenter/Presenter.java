@@ -18,7 +18,4 @@ public class Presenter<T extends IMainActivity> {
         this.view = view;
     }
 
-    public void initialize() {
-
-    }
 }

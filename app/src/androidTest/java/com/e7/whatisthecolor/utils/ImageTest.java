@@ -1,4 +1,4 @@
-package com.e7.whatisthecolor;
+package com.e7.whatisthecolor.utils;
 
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
