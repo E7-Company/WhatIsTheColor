@@ -46,7 +46,7 @@ public class ImageTest {
         String colorHex = String.format("%06X", 0xFFFFFF & avgColor);
         assertEquals("000000", colorHex);
 
-        String colorName = "Black";//Colors.getColorName(colorHex);
+        String colorName = Colors.getColorName(colorHex);
         assertEquals("Black", colorName);
     }
 }
